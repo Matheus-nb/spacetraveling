@@ -5,9 +5,10 @@ import Prismic from '@prismicio/client';
 
 import { getPrismicClient } from '../services/prismic';
 
-import commonStyles from '../styles/common.module.scss';
 import styles from './home.module.scss';
-import { RichText } from 'prismic-dom';
+
+import { FiCalendar, FiUser } from 'react-icons/fi'
+import { useEffect, useState } from 'react';
 
 interface Post {
   uid?: string;
@@ -29,6 +30,40 @@ interface HomeProps {
 }
 
 export default function Home({ postsPagination }: HomeProps) {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [nextPage, setNextPage] = useState('');
+
+  useEffect(() => {
+    setPosts(postsPagination.results);
+    setNextPage(postsPagination.next_page);
+  }, [postsPagination.results, postsPagination.next_page]);
+
+  function handlePagination(): void {
+    fetch(nextPage)
+      .then(res => res.json())
+      .then(data => {
+        const formattedData = data.results.map(post => {
+          return {
+            uid: post.uid,
+            first_publication_date: new Date(post.first_publication_date).toLocaleDateString('pt-BR', {
+              day: '2-digit',
+              month: 'long',
+              year: 'numeric',
+            }),
+            data: {
+              title: post.data.title,
+              subtitle: post.data.subtitle,
+              author: post.data.author,
+            },
+          };
+        });
+
+        setPosts([...posts, ...formattedData]);
+        setNextPage(data.next_page);
+      });
+  }
+
+
   return (
     <>
       <Head>
@@ -36,22 +71,41 @@ export default function Home({ postsPagination }: HomeProps) {
       </Head>
 
       <main className={styles.container}>
+
+        <Link href={`/`}>
+          <a>
+            <img src="/Logo.svg" alt="logo" />
+          </a>
+        </Link>
+
         <div className={styles.posts}>
           {
-            postsPagination.results.map(post => (
-              <Link href={`/posts/${post.uid}`}>
-                <a key={post.uid} >
+            posts.map(post => (
+              <Link href={`/post/${post.uid}`} key={post.uid}>
+                <a>
                   <strong>{post.data.title}</strong>
                   <p>{post.data.subtitle}</p>
-                  <div>
-                    <time>{post.first_publication_date}</time>
-                    <p>{post.data.author}</p>
+                  <div className={styles.infos}>
+                    <div className={styles.info}>
+                      <p><FiCalendar /></p>
+                      <time>{post.first_publication_date}</time>
+                    </div>
+                    <div className={styles.info}>
+                      <p><FiUser /></p>
+                      <p>{post.data.author}</p>
+                    </div>
                   </div>
                 </a>
               </Link>
             ))
           }
         </div>
+
+        {nextPage && (
+          <button type="button" onClick={handlePagination}>
+            Carregar mais posts
+          </button>
+        )}
       </main>
     </>
   )
@@ -87,7 +141,6 @@ export const getStaticProps: GetStaticProps = async () => {
     results: posts,
     next_page: postsResponse.next_page,
   }
-
 
   return {
     props: {
